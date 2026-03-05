@@ -5,6 +5,7 @@ import OrderType from "./pages/OrderType";
 import Menu from "./pages/Menu";
 import Payment from "./pages/Payment";
 import OrderConfirmed from "./pages/OrderConfirmed";
+import PosSettings from "./pages/PosSettings";
 
 const router = createBrowserRouter([
   {
@@ -14,8 +15,10 @@ const router = createBrowserRouter([
       { index: true, element: <Welcome /> },
       { path: "order-type", element: <OrderType /> },
       { path: "menu", element: <Menu /> },
+      { path: "resume/:orderNumber", element: <Menu /> },
       { path: "payment", element: <Payment /> },
       { path: "confirmed", element: <OrderConfirmed /> },
+      { path: "settings", element: <PosSettings /> },
     ],
   },
 ]);

@@ -1,6 +1,7 @@
-import { Minus, Plus, Trash2 } from "lucide-react";
+import { Minus, Plus, Trash2, HeadphonesIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { CartItem } from "@/types/product";
+import { useOrder } from "@/context/OrderContext";
 
 interface CartSidebarProps {
   cartItems: CartItem[];
@@ -16,6 +17,7 @@ export default function CartSidebar({
   onRemove,
 }: CartSidebarProps) {
   const navigate = useNavigate();
+  const { requestAssistance, isConnected } = useOrder();
   const subtotal = cartItems.reduce((sum, i) => sum + i.price * i.qty, 0);
   const tax = subtotal * 0.1;
   const total = subtotal + tax;
@@ -98,6 +100,16 @@ export default function CartSidebar({
         <p className="text-3xl font-extrabold" style={{ color: "#B5E533" }}>
           ${total.toFixed(2)}
         </p>
+
+        <button
+          onClick={() => requestAssistance(cartItems)}
+          disabled={cartItems.length === 0 || !isConnected}
+          className="w-full py-3 rounded-full text-black font-bold text-sm flex items-center justify-center gap-2 border-2 transition-all duration-200 hover:opacity-80 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+          style={{ borderColor: "#B5E533" }}
+        >
+          <HeadphonesIcon size={16} />
+          Request Assistance
+        </button>
 
         <button
           onClick={() => navigate("/payment", { state: { cartItems, total } })}

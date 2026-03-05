@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { mockCombinations } from "@data/mockCombinations";
 import promoVideo from "@assets/barbecue-restaurant-menu-food-promo-sale.mp4";
 import type { CartItem, Product } from "@/types/product";
 import CartSidebar from "@ui/components/CartSidebar";
+import AssistanceBanner from "@ui/components/AssistanceBanner";
 import menuTemplate from "@assets/dish-placeholder.jpg";
+import { useOrder } from "@/context/OrderContext";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type View = "home" | "category";
@@ -121,9 +123,38 @@ function ProductCard({
 // ─── Main Menu ────────────────────────────────────────────────────────────────
 
 export default function Menu() {
+  const { activeOrder, updateOrder } = useOrder();
   const [view, setView] = useState<View>("home");
   const [selectedCat, setSelectedCat] = useState<SelectedCategory | null>(null);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+
+  // Pre-populate cart from a POS-assigned order
+  useEffect(() => {
+    if (!activeOrder) return;
+    const mapped: CartItem[] = activeOrder.items.map((li) => {
+      const allProducts = mockCombinations.flatMap((g) =>
+        g.categories.flatMap((c) => c.products),
+      );
+      const product = allProducts.find((p) => p.id === li.productId);
+      return {
+        id: li.productId,
+        name: li.name,
+        price: li.price,
+        qty: li.qty,
+        code: product?.code ?? "",
+        description: product?.description ?? null,
+        category_id: product?.category_id ?? "",
+        active: product?.active ?? true,
+        sort_order: product?.sort_order ?? 0,
+        is_sold_out: product?.is_sold_out ?? 0,
+        media: product?.media ?? "",
+        overrides: product?.overrides ?? "",
+        is_product_tag: product?.is_product_tag ?? false,
+        barcodes: product?.barcodes ?? "",
+      };
+    });
+    if (mapped.length > 0) setCartItems(mapped);
+  }, [activeOrder?.orderId]);
 
   const allCategories = mockCombinations.flatMap((g) =>
     g.categories.map((c) => ({ ...c, groupId: g.id, products: c.products })),
@@ -145,20 +176,32 @@ export default function Menu() {
       return [...prev, { ...product, qty: 1 }];
     });
   }
+  function syncIfActive(updated: CartItem[]) {
+    if (activeOrder) updateOrder(activeOrder.orderId, updated);
+  }
+
   function handleIncrease(id: string) {
-    setCartItems((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, qty: i.qty + 1 } : i)),
-    );
+    setCartItems((prev) => {
+      const next = prev.map((i) => (i.id === id ? { ...i, qty: i.qty + 1 } : i));
+      syncIfActive(next);
+      return next;
+    });
   }
   function handleDecrease(id: string) {
-    setCartItems((prev) =>
-      prev
+    setCartItems((prev) => {
+      const next = prev
         .map((i) => (i.id === id ? { ...i, qty: i.qty - 1 } : i))
-        .filter((i) => i.qty > 0),
-    );
+        .filter((i) => i.qty > 0);
+      syncIfActive(next);
+      return next;
+    });
   }
   function handleRemove(id: string) {
-    setCartItems((prev) => prev.filter((i) => i.id !== id));
+    setCartItems((prev) => {
+      const next = prev.filter((i) => i.id !== id);
+      syncIfActive(next);
+      return next;
+    });
   }
 
   function selectCategory(cat: { id: string; name: string; groupId: string }) {
@@ -173,6 +216,15 @@ export default function Menu() {
       className="h-screen w-screen flex overflow-hidden p-3 gap-3"
       style={{ backgroundColor: "#D8D8D3" }}
     >
+      <AssistanceBanner />
+      {activeOrder && (
+        <div
+          className="absolute top-4 left-1/2 -translate-x-1/2 z-40 px-6 py-2 rounded-full text-sm font-bold text-black shadow-lg"
+          style={{ backgroundColor: "#B5E533" }}
+        >
+          Continuing order #{activeOrder.orderNumber} from cashier
+        </div>
+      )}
       {view === "home" ? (
         <>
           {/* ── LEFT: Categories (50%) ── */}

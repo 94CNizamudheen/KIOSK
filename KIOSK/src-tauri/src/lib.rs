@@ -1,15 +1,7 @@
 use tauri::Manager;
 
+pub mod commands;
 pub mod db;
-
-// ─── Commands ────────────────────────────────────────────────────────────────
-// Add your Rust commands here.
-// Call from frontend: invoke("command_name", { arg: value })
-
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello from Rust, {}!", name)
-}
 
 // ─── Entry point ─────────────────────────────────────────────────────────────
 
@@ -22,8 +14,12 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            greet
-            // add more commands here
+            commands::kiosk_order::upsert_order,
+            commands::kiosk_order::get_order,
+            commands::kiosk_order::get_active_orders,
+            commands::kiosk_order::update_order_status,
+            commands::kiosk_order::mark_order_completed,
+            commands::kiosk_order::delete_order,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

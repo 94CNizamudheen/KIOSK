@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "db:generate:sqlite": "drizzle-kit generate --config=./src/db/Schema/drizzle.config.ts"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",
