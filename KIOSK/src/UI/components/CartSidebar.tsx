@@ -2,7 +2,7 @@ import { Minus, Plus, Trash2, HeadphonesIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { CartItem } from "@/types/product";
 import { useOrder } from "@/context/OrderContext";
-
+import emptyCartImg from "@assets/empty-cart.png";
 interface CartSidebarProps {
   cartItems: CartItem[];
   onIncrease: (id: string) => void;
@@ -39,9 +39,14 @@ export default function CartSidebar({
       {/* Items */}
       <div className="flex-1 overflow-y-auto space-y-2">
         {cartItems.length === 0 ? (
-          <p className="text-center text-gray-400 text-sm mt-8">
-            Your cart is empty
-          </p>
+          <div className="flex flex-col items-center justify-center flex-1 mt-4">
+            <img
+              src={emptyCartImg}
+              alt="Empty cart"
+              className="w-40 h-40 object-contain opacity-80"
+            />
+            <p className="text-gray-400 text-sm mt-2">No items added yet</p>
+          </div>
         ) : (
           cartItems.map((item) => (
             <div
@@ -113,8 +118,9 @@ export default function CartSidebar({
 
         <button
           onClick={() => navigate("/payment", { state: { cartItems, total } })}
-          className="w-full py-4 rounded-full text-black font-extrabold text-base transition-all duration-200 hover:opacity-90 active:scale-95"
+          className="w-full py-4 rounded-full text-black font-extrabold text-base transition-all duration-200 hover:opacity-90 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
           style={{ backgroundColor: "#B5E533" }}
+          disabled={cartItems?.length === 0}
         >
           Complete order
         </button>

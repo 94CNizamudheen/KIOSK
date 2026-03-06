@@ -1,7 +1,7 @@
-import { X, Minus, Plus, Trash2, ShoppingBag } from "lucide-react";
+import { X, Minus, Plus, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { CartItem } from "@/types/product";
-
+import emptyCartImg from "@assets/empty-cart.png";
 interface CartDrawerProps {
   open: boolean;
   onClose: () => void;
@@ -53,9 +53,13 @@ export default function CartDrawer({
         {/* Items */}
         <div className="flex-1 overflow-y-auto px-5 py-3 space-y-3">
           {cartItems.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full gap-3 text-gray-400">
-              <ShoppingBag size={48} strokeWidth={1} />
-              <p className="text-sm">Your cart is empty</p>
+            <div className="flex flex-col items-center justify-center flex-1 mt-4">
+              <img
+                src={emptyCartImg}
+                alt="Empty cart"
+                className="w-40 h-40 object-contain opacity-80"
+              />
+              <p className="text-gray-400 text-sm mt-2">No items added yet</p>
             </div>
           ) : (
             cartItems.map((item) => (

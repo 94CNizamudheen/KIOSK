@@ -12,6 +12,12 @@ export default function OrderType() {
       className="h-screen w-screen flex flex-col items-center justify-center gap-10 select-none"
       style={{ backgroundColor: "#F1F1EC" }}
     >
+      <button
+        onClick={() => navigate(-1)}
+        className="absolute top-6 left-6 flex items-center gap-2 px-4 py-2 rounded-full border-2 border-gray-900 text-gray-900 font-bold text-sm hover:bg-gray-200 transition-colors"
+      >
+        ← Back
+      </button>
       <h1
         className="text-6xl mb-4"
         style={{ fontFamily: "'Pacifico', cursive", color: "#1C1C1C" }}

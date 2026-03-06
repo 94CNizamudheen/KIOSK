@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { mockCombinations } from "@data/mockCombinations";
 import promoVideo from "@assets/barbecue-restaurant-menu-food-promo-sale.mp4";
 import type { CartItem, Product } from "@/types/product";
 import CartSidebar from "@ui/components/CartSidebar";
 import AssistanceBanner from "@ui/components/AssistanceBanner";
+import PosOrderBanner from "@ui/components/PosOrderBanner";
 import menuTemplate from "@assets/dish-placeholder.jpg";
 import { useOrder } from "@/context/OrderContext";
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -124,6 +126,7 @@ function ProductCard({
 
 export default function Menu() {
   const { activeOrder, updateOrder } = useOrder();
+  const navigate = useNavigate();
   const [view, setView] = useState<View>("home");
   const [selectedCat, setSelectedCat] = useState<SelectedCategory | null>(null);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -217,6 +220,7 @@ export default function Menu() {
       style={{ backgroundColor: "#D8D8D3" }}
     >
       <AssistanceBanner />
+      <PosOrderBanner />
       {activeOrder && (
         <div
           className="absolute top-4 left-1/2 -translate-x-1/2 z-40 px-6 py-2 rounded-full text-sm font-bold text-black shadow-lg"
@@ -240,9 +244,17 @@ export default function Menu() {
               >
                 Delicious
               </span>
-              <span className="w-8 h-8 rounded-full bg-black text-white text-sm font-bold flex items-center justify-center">
-                {cartCount}
-              </span>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => navigate(-1)}
+                  className="px-4 py-2 rounded-full border-2 border-gray-900 text-gray-900 font-bold text-sm hover:bg-gray-100 transition-colors"
+                >
+                  ← Back
+                </button>
+                <span className="w-8 h-8 rounded-full bg-black text-white text-sm font-bold flex items-center justify-center">
+                  {cartCount}
+                </span>
+              </div>
             </div>
 
             <h2 className="text-3xl font-extrabold text-gray-900 mb-0.5">

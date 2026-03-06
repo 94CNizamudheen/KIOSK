@@ -15,6 +15,10 @@ import { getPosUrl, getTerminalId } from "@/services/connectionConfig";
 
 interface OrderContextValue {
   activeOrder: Order | null;
+  /** Set when POS assigns an order to this KIOSK — cleared once customer dismisses */
+  posAssignedOrder: Order | null;
+  clearPosAssignedOrder: () => void;
+  clearActiveOrder: () => void;
   isConnected: boolean;
   requestAssistance: (items: CartItem[]) => void;
   updateOrder: (orderId: string, items: CartItem[]) => void;
@@ -37,11 +41,14 @@ function toLineItems(items: CartItem[]): OrderLineItem[] {
 export function OrderProvider({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
+  const [posAssignedOrder, setPosAssignedOrder] = useState<Order | null>(null);
   const [isConnected, setIsConnected] = useState(false);
 
-  // Keep a ref so event handlers can read current activeOrder without stale closure
+  // Keep refs so event handlers can read current values without stale closures
   const activeOrderRef = useRef<Order | null>(null);
   activeOrderRef.current = activeOrder;
+  const posAssignedOrderRef = useRef<Order | null>(null);
+  posAssignedOrderRef.current = posAssignedOrder;
 
   useEffect(() => {
     // Boot WS connection — config stored in localStorage, falls back to env vars
@@ -78,25 +85,46 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         },
       ),
 
-      // POS sent order to this KIOSK
+      // POS sent order to this KIOSK — show review overlay, navigate to menu in background
       orderEventBus.subscribe(
         "ORDER_ASSIGNED",
         (msg: WsMessage<{ order: Order }>) => {
-          setActiveOrder(msg.payload.order);
-          orderDb.upsertOrder(msg.payload.order);
+          const order = msg.payload.order;
+          setActiveOrder(order);
+          orderDb.upsertOrder(order);
+          setPosAssignedOrder(order);
           navigate("/menu");
         },
       ),
 
-      // Order updated (POS editing, status change, etc.)
+      // Order updated (POS editing, status change, recall, etc.)
       orderEventBus.subscribe(
         "ORDER_UPDATED",
         (msg: WsMessage<{ order: Order }>) => {
-          orderDb.upsertOrder(msg.payload.order);
+          const updated = msg.payload.order;
+          orderDb.upsertOrder(updated);
+
+          // POS recalled the order: server sets status='TRANSFERRED', ownerTerminal=null
+          // and broadcasts to all. We detect this by checking posAssignedOrder matches
+          // AND the update has no owner (the KIOSK customer's own releaseOrder clears
+          // posAssignedOrderRef before the WS round-trip comes back, so no false trigger).
+          if (
+            posAssignedOrderRef.current?.orderId === updated.orderId &&
+            !updated.ownerTerminal &&
+            updated.status === "TRANSFERRED"
+          ) {
+            setPosAssignedOrder(null);
+            setActiveOrder(null);
+            navigate("/");
+            return;
+          }
+
           setActiveOrder((prev) =>
-            prev?.orderId === msg.payload.order.orderId
-              ? msg.payload.order
-              : prev,
+            prev?.orderId === updated.orderId ? updated : prev,
+          );
+          // Keep posAssignedOrder in sync (items may be updated by POS)
+          setPosAssignedOrder((prev) =>
+            prev?.orderId === updated.orderId ? updated : prev,
           );
         },
       ),
@@ -117,8 +145,12 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
       orderEventBus.subscribe(
         "ORDER_EXPIRED",
         (msg: WsMessage<{ orderId: string }>) => {
-          orderDb.updateOrderStatus(msg.payload.orderId, "EXPIRED");
-          if (activeOrderRef.current?.orderId === msg.payload.orderId) {
+          const { orderId } = msg.payload;
+          orderDb.updateOrderStatus(orderId, "EXPIRED");
+          if (posAssignedOrderRef.current?.orderId === orderId) {
+            setPosAssignedOrder(null);
+          }
+          if (activeOrderRef.current?.orderId === orderId) {
             setActiveOrder(null);
             setTimeout(() => navigate("/"), 5000);
           }
@@ -153,6 +185,9 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     <OrderContext.Provider
       value={{
         activeOrder,
+        posAssignedOrder,
+        clearPosAssignedOrder: () => setPosAssignedOrder(null),
+        clearActiveOrder: () => setActiveOrder(null),
         isConnected,
         requestAssistance,
         updateOrder,
