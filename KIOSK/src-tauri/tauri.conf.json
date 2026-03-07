@@ -15,7 +15,7 @@
         "title": "Kiosk",
         "width": 1080,
         "height": 1920,
-        "resizable": false,
+        "resizable": true,
         "fullscreen": false
       }
     ],

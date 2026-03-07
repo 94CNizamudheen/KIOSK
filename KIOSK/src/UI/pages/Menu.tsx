@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus } from "lucide-react";
 import { mockCombinations } from "@data/mockCombinations";
 import promoVideo from "@assets/barbecue-restaurant-menu-food-promo-sale.mp4";
 import type { CartItem, Product } from "@/types/product";
 import CartSidebar from "@ui/components/CartSidebar";
 import AssistanceBanner from "@ui/components/AssistanceBanner";
 import PosOrderBanner from "@ui/components/PosOrderBanner";
-import menuTemplate from "@assets/dish-placeholder.jpg";
 import { useOrder } from "@/context/OrderContext";
+import { CategoryCard } from "@ui/components/CategoryCard";
+import { ProductCard } from "@ui/components/ProductCard";
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type View = "home" | "category";
@@ -17,109 +18,6 @@ interface SelectedCategory {
   id: string;
   name: string;
   groupId: string;
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function getProductImage(media?: string): string | null {
-  if (!media || media === "[]") return null;
-  try {
-    const parsed = JSON.parse(media) as { filepath: string }[];
-    return parsed[0]?.filepath ?? null;
-  } catch {
-    return null;
-  }
-}
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-function CategoryCard({
-  name,
-  media,
-  badge,
-  onClick,
-}: {
-  name: string;
-  media?: string;
-  badge?: string;
-  onClick: () => void;
-}) {
-  const img = getProductImage(media);
-  return (
-    <button
-      onClick={onClick}
-      className="flex flex-col rounded-2xl overflow-hidden transition-all duration-200 hover:scale-105 active:scale-95 text-left w-full"
-      style={{ backgroundColor: "#E5E5DF" }}
-    >
-      <div className="w-full h-28 overflow-hidden bg-gray-200 flex items-center justify-center">
-        <img src={img || menuTemplate} alt={name} className="w-full h-full object-cover" />
-      </div>
-      <div className="px-3 py-2">
-        <p className="font-extrabold text-gray-900 text-sm">{name}</p>
-        {badge && (
-          <span
-            className="inline-block text-xs font-bold px-2 py-0.5 rounded-full mt-1 text-black"
-            style={{ backgroundColor: "#B5E533" }}
-          >
-            {badge}
-          </span>
-        )}
-      </div>
-    </button>
-  );
-}
-
-function ProductCard({
-  product,
-  onAdd,
-}: {
-  product: Product;
-  onAdd: (p: Product) => void;
-}) {
-  const img = getProductImage(product.media);
-  return (
-    <div
-      className="rounded-2xl overflow-hidden flex flex-col cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95"
-      style={{ backgroundColor: "#E5E5DF" }}
-      onClick={() => onAdd(product)}
-    >
-      <div className="h-36 bg-gray-200 flex items-center justify-center overflow-hidden">
-        {img ? (
-          <img
-            src={img}
-            alt={product.name}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <img
-            src={menuTemplate}
-            alt={product.name}
-            className="w-full h-full object-cover"
-          />
-        )}
-      </div>
-      <div className="p-3 flex items-end justify-between gap-1">
-        <div className="flex-1 min-w-0">
-          <p className="font-extrabold text-gray-900 text-sm line-clamp-2 leading-tight">
-            {product.name}
-          </p>
-          <p className="text-sm font-bold text-gray-600 mt-0.5">
-            ${product.price.toFixed(2)}
-          </p>
-        </div>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onAdd(product);
-          }}
-          className="w-9 h-9 rounded-full flex items-center justify-center text-black transition-colors hover:opacity-80 shrink-0"
-          style={{ backgroundColor: "#B5E533" }}
-        >
-          <Plus size={18} />
-        </button>
-      </div>
-    </div>
-  );
 }
 
 // ─── Main Menu ────────────────────────────────────────────────────────────────
@@ -185,7 +83,9 @@ export default function Menu() {
 
   function handleIncrease(id: string) {
     setCartItems((prev) => {
-      const next = prev.map((i) => (i.id === id ? { ...i, qty: i.qty + 1 } : i));
+      const next = prev.map((i) =>
+        i.id === id ? { ...i, qty: i.qty + 1 } : i,
+      );
       syncIfActive(next);
       return next;
     });
