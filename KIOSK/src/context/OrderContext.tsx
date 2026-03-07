@@ -24,6 +24,10 @@ interface OrderContextValue {
   updateOrder: (orderId: string, items: CartItem[]) => void;
   releaseOrder: (orderId: string) => void;
   claimOrder: (orderId: string) => void;
+  /** Accept a POS-sent order — transitions it from PENDING_KIOSK to TRANSFERRED */
+  acceptOrder: (orderId: string) => void;
+  /** Complete KIOSK payment — sends order to POS DB and navigates to /confirmed */
+  completeKioskOrder: (orderId: string | null, items: CartItem[], method: string) => void;
 }
 
 const OrderContext = createContext<OrderContextValue | null>(null);
@@ -49,6 +53,9 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
   activeOrderRef.current = activeOrder;
   const posAssignedOrderRef = useRef<Order | null>(null);
   posAssignedOrderRef.current = posAssignedOrder;
+
+  // Tracks orderId of in-flight KIOSK_COMPLETE_ORDER for POS→KIOSK flow
+  const pendingKioskCompletionRef = useRef<string | null>(null);
 
   useEffect(() => {
     // Boot WS connection — config stored in localStorage, falls back to env vars
@@ -97,27 +104,13 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         },
       ),
 
-      // Order updated (POS editing, status change, recall, etc.)
+      // Order updated (POS editing items, status change, etc.)
+      // Note: POS cancel / KIOSK reject are handled via ORDER_CANCELLED, not here.
       orderEventBus.subscribe(
         "ORDER_UPDATED",
         (msg: WsMessage<{ order: Order }>) => {
           const updated = msg.payload.order;
           orderDb.upsertOrder(updated);
-
-          // POS recalled the order: server sets status='TRANSFERRED', ownerTerminal=null
-          // and broadcasts to all. We detect this by checking posAssignedOrder matches
-          // AND the update has no owner (the KIOSK customer's own releaseOrder clears
-          // posAssignedOrderRef before the WS round-trip comes back, so no false trigger).
-          if (
-            posAssignedOrderRef.current?.orderId === updated.orderId &&
-            !updated.ownerTerminal &&
-            updated.status === "TRANSFERRED"
-          ) {
-            setPosAssignedOrder(null);
-            setActiveOrder(null);
-            navigate("/");
-            return;
-          }
 
           setActiveOrder((prev) =>
             prev?.orderId === updated.orderId ? updated : prev,
@@ -129,14 +122,26 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         },
       ),
 
-      // POS completed payment
+      // Order completed — navigate to /confirmed with real order data
       orderEventBus.subscribe(
         "ORDER_COMPLETED",
         (msg: WsMessage<{ order: Order }>) => {
-          orderDb.upsertOrder(msg.payload.order);
-          if (activeOrderRef.current?.orderId === msg.payload.order.orderId) {
+          const { order } = msg.payload;
+          orderDb.upsertOrder(order);
+
+          const myId = orderWebSocketService.getTerminalId();
+          const isMyCompletion =
+            // Self-service: this KIOSK originated the order
+            order.originTerminal.terminalId === myId ||
+            // POS→KIOSK flow: we tracked the orderId we were completing
+            pendingKioskCompletionRef.current === order.orderId;
+
+          if (isMyCompletion) {
+            pendingKioskCompletionRef.current = null;
             setActiveOrder(null);
-            navigate("/confirmed");
+            navigate("/confirmed", {
+              state: { orderNumber: order.orderNumber, total: order.total },
+            });
           }
         },
       ),
@@ -153,6 +158,21 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
           if (activeOrderRef.current?.orderId === orderId) {
             setActiveOrder(null);
             setTimeout(() => navigate("/"), 5000);
+          }
+        },
+      ),
+
+      // Order cancelled (POS recalled or KIOSK rejected before acceptance)
+      // Always remove from local DB — it was never truly transferred
+      orderEventBus.subscribe(
+        "ORDER_CANCELLED",
+        (msg: WsMessage<{ orderId: string }>) => {
+          const { orderId } = msg.payload;
+          orderDb.deleteOrder(orderId);
+          if (posAssignedOrderRef.current?.orderId === orderId) {
+            setPosAssignedOrder(null);
+            setActiveOrder(null);
+            navigate("/");
           }
         },
       ),
@@ -181,6 +201,19 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     orderWebSocketService.claimOrder(orderId);
   }
 
+  function acceptOrder(orderId: string) {
+    orderWebSocketService.acceptKioskOrder(orderId);
+    setActiveOrder(null);
+  }
+
+  function completeKioskOrder(orderId: string | null, items: CartItem[], method: string) {
+    if (orderId) {
+      // Track so ORDER_COMPLETED handler knows this is our completion
+      pendingKioskCompletionRef.current = orderId;
+    }
+    orderWebSocketService.completeKioskOrder(orderId, toLineItems(items), method);
+  }
+
   return (
     <OrderContext.Provider
       value={{
@@ -193,6 +226,8 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         updateOrder,
         releaseOrder,
         claimOrder,
+        acceptOrder,
+        completeKioskOrder,
       }}
     >
       {children}

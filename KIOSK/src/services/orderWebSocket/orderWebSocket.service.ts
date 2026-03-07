@@ -55,6 +55,20 @@ class OrderWebSocketService {
     this.client?.send("REQUEST_ASSISTANCE", { items });
   }
 
+  /** KIOSK customer accepted the POS-sent order (proceed to payment or add more items) */
+  acceptKioskOrder(orderId: string): void {
+    this.client?.send("KIOSK_ACCEPTED", { orderId });
+  }
+
+  /** KIOSK customer completed payment — persists completed order to POS DB */
+  completeKioskOrder(
+    orderId: string | null,
+    items: OrderLineItem[],
+    method: string,
+  ): void {
+    this.client?.send("KIOSK_COMPLETE_ORDER", { orderId, items, method });
+  }
+
   // ─── Shared actions ───────────────────────────────────────────────────────
 
   /** Either terminal: update order items */

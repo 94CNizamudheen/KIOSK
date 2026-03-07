@@ -1,31 +1,41 @@
-import { ShoppingBag, Plus, ArrowRight } from "lucide-react";
+import { ShoppingBag, Plus, ArrowRight, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useOrder } from "@/context/OrderContext";
 
 export default function PosOrderBanner() {
   const navigate = useNavigate();
-  const { posAssignedOrder, clearPosAssignedOrder, releaseOrder, clearActiveOrder } = useOrder();
+  const { posAssignedOrder, clearPosAssignedOrder, acceptOrder, releaseOrder, clearActiveOrder } = useOrder();
 
   if (!posAssignedOrder) return null;
 
   const order = posAssignedOrder;
   const total = order.total;
 
-  function handleAddMore() {
+  function handleReject() {
+    const orderId = order.orderId;
     clearPosAssignedOrder();
-    clearActiveOrder(); // prevent AssistanceBanner from showing (status=TRANSFERRED)
-    // Already on /menu with cart pre-filled — just dismiss the overlay
+    clearActiveOrder();
+    releaseOrder(orderId); // PENDING_KIOSK → server deletes + notifies POS via ORDER_CANCELLED
+    navigate("/");
+  }
+
+  function handleAddMore() {
+    const orderId = order.orderId;
+    clearPosAssignedOrder();
+    clearActiveOrder();
+    acceptOrder(orderId); // transitions PENDING_KIOSK → TRANSFERRED, signals POS
   }
 
   function handleProceedToPayment() {
-    // Capture data before releasing (releaseOrder clears activeOrder)
     const orderNumber = order.orderNumber;
     const items = order.items;
     const orderTotal = order.total;
+    const orderId = order.orderId;
     clearPosAssignedOrder();
-    releaseOrder(order.orderId); // notifies POS to clear its cart
+    acceptOrder(orderId); // transitions PENDING_KIOSK → TRANSFERRED, signals POS
     navigate("/payment", {
       state: {
+        orderId,        // needed by Payment to complete the existing order
         orderNumber,
         cartItems: items.map((i) => ({
           id: i.productId,
@@ -122,6 +132,13 @@ export default function PosOrderBanner() {
           >
             <Plus className="w-4 h-4" />
             Add More Items
+          </button>
+          <button
+            onClick={handleReject}
+            className="w-full py-3 rounded-full border-2 border-red-200 text-red-500 font-bold text-sm hover:border-red-400 hover:bg-red-50 transition-all flex items-center justify-center gap-2"
+          >
+            <X className="w-4 h-4" />
+            Reject Order
           </button>
         </div>
       </div>

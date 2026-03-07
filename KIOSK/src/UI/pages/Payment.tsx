@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Banknote, CreditCard, Wallet, ArrowLeft } from "lucide-react";
 import type { CartItem } from "@/types/product";
+import { useOrder } from "@/context/OrderContext";
 
 type PaymentMethod = "cash" | "card" | "ewallet";
 
@@ -34,9 +35,27 @@ const paymentOptions: {
 export default function Payment() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { total = 0 } =
-    (location.state as { cartItems?: CartItem[]; total?: number }) ?? {};
+  const { completeKioskOrder } = useOrder();
+
+  const {
+    total = 0,
+    cartItems = [] as CartItem[],
+    orderId = null as string | null,
+  } = (location.state as {
+    total?: number;
+    cartItems?: CartItem[];
+    orderId?: string | null;
+  }) ?? {};
+
   const [selected, setSelected] = useState<PaymentMethod | null>(null);
+  const [processing, setProcessing] = useState(false);
+
+  function handleConfirm() {
+    if (!selected || processing) return;
+    setProcessing(true);
+    completeKioskOrder(orderId, cartItems, selected.toUpperCase());
+    // Navigation to /confirmed is handled by OrderContext on ORDER_COMPLETED event
+  }
 
   return (
     <div
@@ -47,7 +66,8 @@ export default function Payment() {
       <div className="bg-white px-6 py-4 flex items-center gap-4 shadow-sm">
         <button
           onClick={() => navigate("/menu")}
-          className="w-10 h-10 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
+          disabled={processing}
+          className="w-10 h-10 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors disabled:opacity-40"
         >
           <ArrowLeft size={18} />
         </button>
@@ -71,7 +91,7 @@ export default function Payment() {
           {paymentOptions.map((option) => (
             <button
               key={option.id}
-              onClick={() => setSelected(option.id)}
+              onClick={() => !processing && setSelected(option.id)}
               className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 bg-white transition-all duration-200"
               style={{
                 borderColor: selected === option.id ? "#B5E533" : "#e5e7eb",
@@ -106,15 +126,12 @@ export default function Payment() {
         </div>
 
         <button
-          onClick={() =>
-            selected &&
-            navigate("/confirmed", { state: { method: selected, total } })
-          }
-          disabled={!selected}
+          onClick={handleConfirm}
+          disabled={!selected || processing}
           className="w-full max-w-md py-4 rounded-full font-extrabold text-lg text-black transition-all duration-200 disabled:opacity-30"
           style={{ backgroundColor: "#B5E533" }}
         >
-          Confirm Payment
+          {processing ? "Processing…" : "Confirm Payment"}
         </button>
       </div>
     </div>
