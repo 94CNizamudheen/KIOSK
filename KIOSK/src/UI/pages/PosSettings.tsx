@@ -13,15 +13,22 @@ import { useOrder } from "@/context/OrderContext";
 export default function PosSettings() {
   const navigate = useNavigate();
   const [url, setUrl] = useState(getPosUrl());
-  const [terminalId, setTerminalId] = useState(getTerminalId());
+  const KIOSK_PREFIX = "KIOSK-";
+  const storedId = getTerminalId();
+  const [terminalSuffix, setTerminalSuffix] = useState(
+    storedId.startsWith(KIOSK_PREFIX)
+      ? storedId.slice(KIOSK_PREFIX.length)
+      : storedId,
+  );
   const [saved, setSaved] = useState(false);
   const { position, setPosition } = useApp();
   const { isConnected } = useOrder(); // always accurate — managed by OrderContext
 
   function handleSave() {
-    if (!url.trim() || !terminalId.trim()) return;
+    if (!url.trim() || !terminalSuffix.trim()) return;
+    const terminalId = `${KIOSK_PREFIX}${terminalSuffix.trim()}`;
     saveConnectionConfig(url, terminalId);
-    orderWebSocketService.init(url.trim(), terminalId.trim(), "KIOSK");
+    orderWebSocketService.init(url.trim(), terminalId, "KIOSK");
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   }
@@ -53,7 +60,7 @@ export default function PosSettings() {
           ) : (
             <span className="flex items-center gap-1.5 text-sm font-semibold text-red-500">
               <WifiOff className="w-4 h-4" />
-              DisisConnected
+              Disconnected
             </span>
           )}
         </div>
@@ -82,15 +89,27 @@ export default function PosSettings() {
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Terminal ID
             </label>
-            <input
-              type="text"
-              value={terminalId}
-              onChange={(e) => setTerminalId(e.target.value)}
-              placeholder="KIOSK-1"
-              className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 text-sm font-mono focus:outline-none focus:border-gray-600 transition"
-            />
+            <div className="flex items-stretch rounded-xl border-2 border-gray-200 overflow-hidden focus-within:border-gray-600 transition">
+              {/* Fixed prefix */}
+              <span className="flex items-center px-4 bg-gray-100 text-sm font-mono font-bold text-gray-500 border-r-2 border-gray-200 select-none">
+                KIOSK-
+              </span>
+              {/* User types only the suffix */}
+              <input
+                type="text"
+                value={terminalSuffix}
+                onChange={(e) =>
+                  setTerminalSuffix(e.target.value.replace(/\s/g, ""))
+                }
+                placeholder="1"
+                className="flex-1 px-4 py-3 text-sm font-mono focus:outline-none bg-white"
+              />
+            </div>
             <p className="text-xs text-gray-400 mt-1.5">
-              Unique identifier for this kiosk terminal
+              Terminal ID will be saved as{" "}
+              <span className="font-mono font-semibold text-gray-600">
+                KIOSK-{terminalSuffix || "…"}
+              </span>
             </p>
           </div>
 
@@ -124,7 +143,7 @@ export default function PosSettings() {
 
           <button
             onClick={handleSave}
-            disabled={!url.trim() || !terminalId.trim()}
+            disabled={!url.trim() || !terminalSuffix.trim()}
             className="w-full py-3.5 flex items-center justify-center gap-2 rounded-xl font-bold text-sm transition disabled:opacity-40 disabled:cursor-not-allowed"
             style={{ backgroundColor: "#B5E533", color: "#1C1C1C" }}
           >
