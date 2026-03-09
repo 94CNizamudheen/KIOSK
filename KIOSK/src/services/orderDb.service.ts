@@ -49,3 +49,11 @@ export async function markOrderCompleted(
 export async function deleteOrder(orderId: string): Promise<boolean> {
   return invoke<boolean>("delete_order", { orderId });
 }
+
+/**
+ * Find a non-terminal order by its human-readable order number (e.g. "A047").
+ * Returns null if not found or already completed/expired.
+ */
+export async function getOrderByNumber(orderNumber: string): Promise<Order | null> {
+  return invoke<Order | null>("get_order_by_number", { orderNumber });
+}

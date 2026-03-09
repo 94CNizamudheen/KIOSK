@@ -1,29 +1,25 @@
-import { ShoppingBag, Plus, ArrowRight, X } from "lucide-react";
+import { ShoppingBag, Plus, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useOrder } from "@/context/OrderContext";
 
 export default function PosOrderBanner() {
   const navigate = useNavigate();
-  const { posAssignedOrder, clearPosAssignedOrder, acceptOrder, releaseOrder, clearActiveOrder } = useOrder();
+  const {
+    posAssignedOrder,
+    clearPosAssignedOrder,
+    acceptOrder,
+  } = useOrder();
 
   if (!posAssignedOrder) return null;
 
   const order = posAssignedOrder;
   const total = order.total;
 
-  function handleReject() {
-    const orderId = order.orderId;
-    clearPosAssignedOrder();
-    clearActiveOrder();
-    releaseOrder(orderId); // PENDING_KIOSK → server deletes + notifies POS via ORDER_CANCELLED
-    navigate("/");
-  }
-
   function handleAddMore() {
-    const orderId = order.orderId;
+    // Dismiss the banner but KEEP activeOrder so Menu.tsx can sync cart changes
+    // and pass the correct orderId to payment.
     clearPosAssignedOrder();
-    clearActiveOrder();
-    acceptOrder(orderId); // transitions PENDING_KIOSK → TRANSFERRED, signals POS
+    acceptOrder(order.orderId); // transitions PENDING_KIOSK → TRANSFERRED
   }
 
   function handleProceedToPayment() {
@@ -35,7 +31,7 @@ export default function PosOrderBanner() {
     acceptOrder(orderId); // transitions PENDING_KIOSK → TRANSFERRED, signals POS
     navigate("/payment", {
       state: {
-        orderId,        // needed by Payment to complete the existing order
+        orderId, // needed by Payment to complete the existing order
         orderNumber,
         cartItems: items.map((i) => ({
           id: i.productId,
@@ -68,9 +64,7 @@ export default function PosOrderBanner() {
           <p className="text-4xl font-extrabold text-gray-900">
             #{order.orderNumber}
           </p>
-          <p className="font-bold text-gray-700 text-sm text-center">
-            A team member has started your order
-          </p>
+
           <p className="text-xs text-gray-400 text-center">
             Review the items below. You can add more or go straight to payment.
           </p>
@@ -132,13 +126,6 @@ export default function PosOrderBanner() {
           >
             <Plus className="w-4 h-4" />
             Add More Items
-          </button>
-          <button
-            onClick={handleReject}
-            className="w-full py-3 rounded-full border-2 border-red-200 text-red-500 font-bold text-sm hover:border-red-400 hover:bg-red-50 transition-all flex items-center justify-center gap-2"
-          >
-            <X className="w-4 h-4" />
-            Reject Order
           </button>
         </div>
       </div>

@@ -1,6 +1,17 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { Minus, Plus, Trash2, ArrowLeft, ShoppingBag } from "lucide-react";
 import type { CartItem } from "@/types/product";
+import dishPlaceholder from "@assets/dish-placeholder.jpg";
+
+function getProductImage(media?: string): string {
+  if (!media || media === "[]") return dishPlaceholder;
+  try {
+    const parsed = JSON.parse(media) as { filepath: string }[];
+    return parsed[0]?.filepath ?? dishPlaceholder;
+  } catch {
+    return dishPlaceholder;
+  }
+}
 
 export default function Cart() {
   const navigate = useNavigate();
@@ -47,9 +58,14 @@ export default function Cart() {
                 className="bg-white rounded-2xl p-4 flex items-center gap-4 shadow-sm"
               >
                 <div className="w-16 h-16 rounded-xl bg-gray-100 shrink-0 overflow-hidden">
-                  <div className="w-full h-full flex items-center justify-center text-gray-300">
-                    <ShoppingBag size={24} strokeWidth={1} />
-                  </div>
+                  <img
+                    src={getProductImage(item.media)}
+                    alt={item.name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = dishPlaceholder;
+                    }}
+                  />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-gray-800 line-clamp-1">

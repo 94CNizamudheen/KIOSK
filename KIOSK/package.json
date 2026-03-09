@@ -8,12 +8,13 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "db:generate:sqlite": "drizzle-kit generate --config=./src/db/Schema/drizzle.config.ts"
+    "db:generate:sqlite": "drizzle-kit generate --config=./src/db/drizzle.config.ts"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-opener": "^2.5.3",
     "drizzle-kit": "^0.31.9",
+    "drizzle-orm": "^0.45.1",
     "lucide-react": "^0.577.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.4",

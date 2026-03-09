@@ -4,11 +4,12 @@ import { mockCombinations } from "@data/mockCombinations";
 import promoVideo from "@assets/barbecue-restaurant-menu-food-promo-sale.mp4";
 import type { CartItem, Product } from "@/types/product";
 import CartSidebar from "@ui/components/CartSidebar";
-import AssistanceBanner from "@ui/components/AssistanceBanner";
 import PosOrderBanner from "@ui/components/PosOrderBanner";
 import { useOrder } from "@/context/OrderContext";
 import { CategoryCard } from "@ui/components/CategoryCard";
 import { ProductCard } from "@ui/components/ProductCard";
+import { Watermark } from "@ui/components/Watermark";
+import { useApp } from "@/context/AppContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -23,11 +24,46 @@ interface SelectedCategory {
 // ─── Main Menu ────────────────────────────────────────────────────────────────
 
 export default function Menu() {
-  const { activeOrder, updateOrder } = useOrder();
+  const { activeOrder, updateOrder, assistanceHandedBack } = useOrder();
+  const { syncCart } = useApp();
+  const showWatermark =
+    activeOrder?.status === "IN_PROGRESS" && !assistanceHandedBack;
   const navigate = useNavigate();
   const [view, setView] = useState<View>("home");
   const [selectedCat, setSelectedCat] = useState<SelectedCategory | null>(null);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+
+  // Keep AppContext's cartRef in sync so PULL_KIOSK_CART has the latest items
+  useEffect(() => { syncCart(cartItems); }, [cartItems, syncCart]);
+
+  // Re-sync cart in real-time when cashier modifies items during assistance
+  useEffect(() => {
+    if (activeOrder?.status !== "IN_PROGRESS") return;
+    const allProducts = mockCombinations.flatMap((g) =>
+      g.categories.flatMap((c) => c.products),
+    );
+    const mapped: CartItem[] = activeOrder.items.map((li) => {
+      const product = allProducts.find((p) => p.id === li.productId);
+      return {
+        id: li.productId,
+        name: li.name,
+        price: li.price,
+        qty: li.qty,
+        code: product?.code ?? "",
+        description: product?.description ?? null,
+        category_id: product?.category_id ?? "",
+        active: product?.active ?? true,
+        sort_order: product?.sort_order ?? 0,
+        is_sold_out: product?.is_sold_out ?? 0,
+        media: product?.media ?? "",
+        overrides: product?.overrides ?? "",
+        is_product_tag: product?.is_product_tag ?? false,
+        barcodes: product?.barcodes ?? "",
+      };
+    });
+    setCartItems(mapped);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeOrder?.items]);
 
   // Pre-populate cart from a POS-assigned order
   useEffect(() => {
@@ -116,10 +152,9 @@ export default function Menu() {
 
   return (
     <div
-      className="h-screen w-screen flex overflow-hidden p-3 gap-3"
+      className="relative h-screen w-screen flex overflow-hidden p-3 gap-3"
       style={{ backgroundColor: "#D8D8D3" }}
     >
-      <AssistanceBanner />
       <PosOrderBanner />
       {activeOrder && (
         <div
@@ -268,6 +303,26 @@ export default function Menu() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Cashier-assist overlay: covers menu area, blocks all interaction ── */}
+      {showWatermark && (
+        <div
+          className="absolute cursor-not-allowed"
+          style={{
+            top: "0.75rem",
+            left: "0.75rem",
+            bottom: "0.75rem",
+            right: "calc(28% + 0.75rem)",
+            zIndex: 20,
+            backgroundColor: "rgba(255, 255, 255, 0.55)",
+            backdropFilter: "blur(2px)",
+            borderRadius: "1.5rem",
+            pointerEvents: "all",
+          }}
+        >
+          <Watermark />
         </div>
       )}
 

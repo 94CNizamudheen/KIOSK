@@ -128,3 +128,15 @@ pub fn delete_order(conn: &Connection, order_id: &str) -> SqlResult<bool> {
     let changes = conn.execute("DELETE FROM orders WHERE order_id=?1", params![order_id])?;
     Ok(changes > 0)
 }
+
+/// Find a non-terminal order by its human-readable order number (e.g. "A047").
+pub fn get_order_by_number(conn: &Connection, order_number: &str) -> SqlResult<Option<KioskOrder>> {
+    let mut stmt = conn.prepare(
+        "SELECT * FROM orders WHERE order_number = ?1 AND status NOT IN ('COMPLETED','CANCELLED','EXPIRED') LIMIT 1",
+    )?;
+    match stmt.query_row(params![order_number], |row| row_to_order(row)) {
+        Ok(order) => Ok(Some(order)),
+        Err(SqlError::QueryReturnedNoRows) => Ok(None),
+        Err(e) => Err(e),
+    }
+}

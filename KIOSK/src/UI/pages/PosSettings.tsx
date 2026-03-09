@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Wifi, WifiOff, Save } from "lucide-react";
 import { orderWebSocketService } from "@/services/orderWebSocket/orderWebSocket.service";
@@ -7,25 +7,27 @@ import {
   getTerminalId,
   saveConnectionConfig,
 } from "@/services/connectionConfig";
+import { useApp, type KioskPosition } from "@/context/AppContext";
+import { useOrder } from "@/context/OrderContext";
 
 export default function PosSettings() {
   const navigate = useNavigate();
   const [url, setUrl] = useState(getPosUrl());
   const [terminalId, setTerminalId] = useState(getTerminalId());
-  const [connected, setConnected] = useState(orderWebSocketService.isConnected());
   const [saved, setSaved] = useState(false);
-
-  useEffect(() => {
-    orderWebSocketService.onConnectionChange(setConnected);
-  }, []);
+  const { position, setPosition } = useApp();
+  const { isConnected } = useOrder(); // always accurate — managed by OrderContext
 
   function handleSave() {
     if (!url.trim() || !terminalId.trim()) return;
     saveConnectionConfig(url, terminalId);
-    // Reconnect with new settings
     orderWebSocketService.init(url.trim(), terminalId.trim(), "KIOSK");
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
+  }
+
+  function handlePositionChange(p: KioskPosition) {
+    setPosition(p);
   }
 
   return (
@@ -43,7 +45,7 @@ export default function PosSettings() {
         </button>
         <h1 className="text-xl font-bold text-gray-800">POS Connection</h1>
         <div className="ml-auto flex items-center gap-2">
-          {connected ? (
+          {isConnected ? (
             <span className="flex items-center gap-1.5 text-sm font-semibold text-green-600">
               <Wifi className="w-4 h-4" />
               Connected
@@ -51,7 +53,7 @@ export default function PosSettings() {
           ) : (
             <span className="flex items-center gap-1.5 text-sm font-semibold text-red-500">
               <WifiOff className="w-4 h-4" />
-              Disconnected
+              DisisConnected
             </span>
           )}
         </div>
@@ -90,6 +92,34 @@ export default function PosSettings() {
             <p className="text-xs text-gray-400 mt-1.5">
               Unique identifier for this kiosk terminal
             </p>
+          </div>
+
+          {/* Kiosk Position */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Kiosk Position
+            </label>
+            <p className="text-xs text-gray-400 mb-3">
+              Set to <strong>Same</strong> if this kiosk is side-by-side with the POS counter.
+              The cashier can pull the cart directly — no "Move to POS" button shown.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {(["SAME", "DISTANCE"] as KioskPosition[]).map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => handlePositionChange(p)}
+                  className="py-3 rounded-xl border-2 font-bold text-sm transition-all"
+                  style={{
+                    borderColor: position === p ? "#B5E533" : "#e5e7eb",
+                    backgroundColor: position === p ? "#f8ffe0" : "#fff",
+                    color: position === p ? "#5a8800" : "#6b7280",
+                  }}
+                >
+                  {p === "SAME" ? "⇄ Same Position" : "↔ Distance"}
+                </button>
+              ))}
+            </div>
           </div>
 
           <button

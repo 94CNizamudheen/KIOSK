@@ -1,8 +1,30 @@
-import { Minus, Plus, Trash2, HeadphonesIcon } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  Minus,
+  Plus,
+  Trash2,
+  HeadphonesIcon,
+  MapPin,
+  X,
+  MonitorUp,
+  Loader2,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { CartItem } from "@/types/product";
 import { useOrder } from "@/context/OrderContext";
+import { useApp } from "@/context/AppContext";
 import emptyCartImg from "@assets/empty-cart.png";
+import dishPlaceholder from "@assets/dish-placeholder.jpg";
+
+function getProductImage(media?: string): string {
+  if (!media || media === "[]") return dishPlaceholder;
+  try {
+    const parsed = JSON.parse(media) as { filepath: string }[];
+    return parsed[0]?.filepath ?? dishPlaceholder;
+  } catch {
+    return dishPlaceholder;
+  }
+}
 interface CartSidebarProps {
   cartItems: CartItem[];
   onIncrease: (id: string) => void;
@@ -17,17 +39,164 @@ export default function CartSidebar({
   onRemove,
 }: CartSidebarProps) {
   const navigate = useNavigate();
-  const { requestAssistance, isConnected } = useOrder();
+  const {
+    requestMoveToPOS,
+    movedToPosOrder,
+    clearMovedToPosOrder,
+    isConnected,
+    activeOrder,
+    assistanceHandedBack,
+  } = useOrder();
+  const { position } = useApp();
+  const [showAssistDialog, setShowAssistDialog] = useState(false);
+  const [waitingForOrderNumber, setWaitingForOrderNumber] = useState(false);
+
+  // When server confirms the order number, stop the loading spinner
+  useEffect(() => {
+    if (movedToPosOrder) setWaitingForOrderNumber(false);
+  }, [movedToPosOrder]);
+
   const subtotal = cartItems.reduce((sum, i) => sum + i.price * i.qty, 0);
+
+  const isBeingAssisted =
+    activeOrder !== null &&
+    activeOrder.ownerTerminal !== null &&
+    (activeOrder.status === "TRANSFERRED" ||
+      activeOrder.status === "IN_PROGRESS");
   const tax = subtotal * 0.1;
   const total = subtotal + tax;
   const count = cartItems.reduce((s, i) => s + i.qty, 0);
+
+  // function handleStayAtKiosk() {
+  //   setShowAssistDialog(false);
+  //   requestAssistance(cartItems);
+  // }
+
+  function handleMoveToPOS() {
+    setWaitingForOrderNumber(true);
+    requestMoveToPOS(cartItems);
+    // Dialog stays open — waits for movedToPosOrder to show the order number
+  }
+
+  function handleConfirmWalkToPOS() {
+    clearMovedToPosOrder();
+    setShowAssistDialog(false);
+    navigate("/");
+  }
 
   return (
     <div
       className="flex flex-col h-full rounded-2xl p-5"
       style={{ backgroundColor: "#F1F1EC" }}
     >
+      {/* ── Assist dialog (3 states: choice → loading → order number) ─────── */}
+      {showAssistDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div
+            className="relative flex flex-col items-center gap-5 rounded-3xl px-8 py-8 shadow-2xl w-full max-w-sm mx-4"
+            style={{ backgroundColor: "#F1F1EC" }}
+          >
+            {/* Close — only when not mid-request */}
+            {!waitingForOrderNumber && !movedToPosOrder && (
+              <button
+                onClick={() => setShowAssistDialog(false)}
+                className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-gray-200 hover:bg-gray-300 transition"
+              >
+                <X className="w-4 h-4 text-gray-600" />
+              </button>
+            )}
+
+            {/* ── State 1: waiting for server to assign order number ── */}
+            {waitingForOrderNumber && !movedToPosOrder && (
+              <>
+                <Loader2 className="w-12 h-12 animate-spin text-gray-400" />
+                <p className="text-base font-bold text-gray-700 text-center">
+                  Creating your order…
+                </p>
+              </>
+            )}
+
+            {/* ── State 2: order number received — show to customer ── */}
+            {movedToPosOrder && (
+              <>
+                <div
+                  className="w-14 h-14 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: "#B5E533" }}
+                >
+                  <MapPin className="w-7 h-7 text-black" />
+                </div>
+
+                <div className="text-center">
+                  <p className="text-base font-bold text-gray-700">
+                    Walk to the POS counter
+                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Tell the cashier your order number
+                  </p>
+                </div>
+
+                {/* Big order number */}
+                <div
+                  className="w-full rounded-2xl px-6 py-5 flex flex-col items-center gap-1 border-2 border-amber-300"
+                  style={{ backgroundColor: "#fffbeb" }}
+                >
+                  <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">
+                    Your Order Number
+                  </p>
+                  <p className="text-5xl font-black tracking-widest text-amber-700">
+                    #{movedToPosOrder.orderNumber}
+                  </p>
+                  <p className="text-xs text-amber-500 mt-1 text-center">
+                    Show this to the cashier at the POS counter
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleConfirmWalkToPOS}
+                  className="w-full py-4 rounded-full font-extrabold text-base text-black transition-all active:scale-95 hover:opacity-90"
+                  style={{ backgroundColor: "#B5E533" }}
+                >
+                  OK, heading to POS
+                </button>
+              </>
+            )}
+
+            {/* ── State 0: initial choice ── */}
+            {!waitingForOrderNumber && !movedToPosOrder && (
+              <>
+                <div
+                  className="w-14 h-14 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: "#B5E533" }}
+                >
+                  <HeadphonesIcon className="w-7 h-7 text-black" />
+                </div>
+
+                <p className="text-xl font-extrabold text-gray-900">
+                  Are You Sure ?
+                </p>
+
+                <button
+                  onClick={handleMoveToPOS}
+                  className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl bg-white border-2 border-transparent hover:border-gray-400 transition-all active:scale-95 text-left"
+                >
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-gray-800">
+                    <MapPin className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-extrabold text-gray-900 text-sm">
+                      Move to POS Counter
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      Walk to the cashier — your order will be waiting
+                    </p>
+                  </div>
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <span className="text-xl font-extrabold text-gray-900">Your Cart</span>
@@ -53,6 +222,14 @@ export default function CartSidebar({
               key={item.id}
               className="flex items-center gap-2 bg-white rounded-xl p-3"
             >
+              <img
+                src={getProductImage(item.media)}
+                alt={item.name}
+                className="w-12 h-12 rounded-lg object-cover shrink-0 bg-gray-100"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = dishPlaceholder;
+                }}
+              />
               <div className="flex-1 min-w-0">
                 <p className="font-bold text-sm text-gray-800 line-clamp-1">
                   {item.name}
@@ -106,23 +283,35 @@ export default function CartSidebar({
           ${total.toFixed(2)}
         </p>
 
-        <button
-          onClick={() => requestAssistance(cartItems)}
-          disabled={cartItems.length === 0 || !isConnected}
-          className="w-full py-3 rounded-full text-black font-bold text-sm flex items-center justify-center gap-2 border-2 transition-all duration-200 hover:opacity-80 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
-          style={{ borderColor: "#B5E533" }}
-        >
-          <HeadphonesIcon size={16} />
-          Request Assistance
-        </button>
+        {/* SAME position: cashier is right next to the kiosk — no assist button needed.
+            DISTANCE: customer must walk to POS counter.                              */}
+        {position === "DISTANCE" && (
+          <button
+            onClick={() => setShowAssistDialog(true)}
+            disabled={cartItems.length === 0 || !isConnected || isBeingAssisted}
+            className="w-full py-3 rounded-full text-black font-bold text-sm flex items-center justify-center gap-2 border-2 transition-all duration-200 hover:opacity-80 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{ borderColor: "#B5E533" }}
+          >
+            <MonitorUp size={30} />
+            {isBeingAssisted ? "Cashier is helping you" : "Move to POS Counter"}
+          </button>
+        )}
 
         <button
-          onClick={() => navigate("/payment", { state: { cartItems, total } })}
+          onClick={() =>
+            navigate("/payment", {
+              state: {
+                cartItems,
+                total,
+                orderId: activeOrder?.orderId ?? null,
+              },
+            })
+          }
           className="w-full py-4 rounded-full text-black font-extrabold text-base transition-all duration-200 hover:opacity-90 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
           style={{ backgroundColor: "#B5E533" }}
-          disabled={cartItems?.length === 0}
+          disabled={cartItems?.length === 0 || isBeingAssisted}
         >
-          Complete order
+          {assistanceHandedBack ? "Proceed to Payment" : "Complete order"}
         </button>
       </div>
     </div>

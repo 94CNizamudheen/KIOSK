@@ -1,12 +1,21 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import * as orderDb from "@/services/orderDb.service";
 
 export default function OrderConfirmed() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { total = 0, orderNumber = "" } =
-    (location.state as { total?: number; orderNumber?: string }) ?? {};
+  const { total = 0, orderNumber = "", orderId = "" } =
+    (location.state as { total?: number; orderNumber?: string; orderId?: string }) ?? {};
   const [countdown, setCountdown] = useState(10);
+
+  // Delete the completed order from local DB as soon as the confirmation page opens
+  useEffect(() => {
+    if (orderId) {
+      orderDb.deleteOrder(orderId).catch(console.error);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (countdown <= 0) { navigate("/"); return; }

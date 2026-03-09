@@ -1,19 +1,67 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Settings, Wifi, WifiOff } from "lucide-react";
 import { useOrder } from "@/context/OrderContext";
+import * as orderDb from "@/services/orderDb.service";
+
+// Fixed prefix shown to the customer — matches the letter in POS-assigned order numbers (e.g. "A")
+const ORDER_PREFIX = "A";
+const MAX_DIGITS = 4;
 
 export default function Welcome() {
   const navigate = useNavigate();
-  const { claimOrder, isConnected } = useOrder();
+  const { resumeOrderFromDb, isConnected } = useOrder();
   const [showOrderInput, setShowOrderInput] = useState(false);
-  const [orderNumber, setOrderNumber] = useState("");
+  const [digits, setDigits] = useState("");
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  const [looking, setLooking] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  function handleOrderSubmit(e: React.FormEvent) {
+  function handleDigitsChange(e: React.ChangeEvent<HTMLInputElement>) {
+    // Strip non-digits and cap length
+    const val = e.target.value.replace(/\D/g, "").slice(0, MAX_DIGITS);
+    setDigits(val);
+    setLookupError(null);
+  }
+
+  async function handleOrderSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!orderNumber.trim()) return;
-    claimOrder(orderNumber.trim().toUpperCase());
-    navigate("/menu");
+    if (!digits) {
+      setLookupError("Please enter the order number.");
+      return;
+    }
+    const fullNumber = `${ORDER_PREFIX}${digits}`;
+    setLookupError(null);
+    setLooking(true);
+    try {
+      const localOrder = await orderDb.getOrderByNumber(fullNumber);
+      if (localOrder) {
+        resumeOrderFromDb(localOrder);
+        navigate("/menu");
+        return;
+      }
+      setLookupError(
+        `Order #${fullNumber} not found. Please check the number.`,
+      );
+    } catch {
+      setLookupError("Something went wrong. Please try again.");
+    } finally {
+      setLooking(false);
+    }
+  }
+
+  function handleOpen(e: React.MouseEvent) {
+    e.stopPropagation();
+    setShowOrderInput(true);
+    setDigits("");
+    setLookupError(null);
+    setTimeout(() => inputRef.current?.focus(), 50);
+  }
+
+  function handleClose() {
+    setShowOrderInput(false);
+    setDigits("");
+    setLookupError(null);
   }
 
   return (
@@ -72,16 +120,15 @@ export default function Welcome() {
         Touch to proceed
       </button>
 
-      <p className="mt-6 text-gray-400 text-base">Tap anywhere to get started</p>
+      <p className="mt-6 text-gray-400 text-base">
+        Tap anywhere to get started
+      </p>
 
       {/* Order number entry */}
       {!showOrderInput ? (
         <button
           className="mt-8 text-sm font-semibold text-gray-500 underline underline-offset-2 hover:text-gray-700 transition-colors"
-          onClick={(e) => {
-            e.stopPropagation();
-            setShowOrderInput(true);
-          }}
+          onClick={handleOpen}
         >
           I have an order number
         </button>
@@ -91,30 +138,59 @@ export default function Welcome() {
           className="mt-8 flex flex-col items-center gap-3"
           onClick={(e) => e.stopPropagation()}
         >
-          <input
-            autoFocus
-            type="text"
-            value={orderNumber}
-            onChange={(e) => setOrderNumber(e.target.value)}
-            placeholder="e.g. A047"
-            className="px-6 py-3 rounded-full border-2 border-gray-300 text-center text-xl font-bold tracking-widest focus:outline-none focus:border-gray-600 w-48"
-            style={{ backgroundColor: "#fff" }}
-          />
-          <div className="flex gap-3">
+          <p className="text-sm font-semibold text-gray-500">
+            Enter your order number
+          </p>
+
+          {/* Prefix + digit input combined */}
+          <div
+            className="flex items-center rounded-2xl border-2 overflow-hidden"
+            style={{
+              borderColor: lookupError ? "#ef4444" : "#d1d5db",
+              backgroundColor: "#fff",
+            }}
+          >
+            {/* Fixed prefix — not editable */}
+            <div
+              className="px-5 py-4 text-3xl font-black tracking-widest border-r-2 border-gray-200 select-none"
+              style={{ color: "#B5E533" }}
+            >
+              {ORDER_PREFIX}
+            </div>
+
+            {/* Numeric digits only */}
+            <input
+              ref={inputRef}
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={digits}
+              onChange={handleDigitsChange}
+              placeholder="0 0 0"
+              maxLength={MAX_DIGITS}
+              className="px-5 py-4 text-3xl font-black tracking-widest text-center text-gray-900 focus:outline-none bg-transparent w-36"
+            />
+          </div>
+
+          {lookupError && (
+            <p className="text-xs text-red-500 font-semibold text-center max-w-xs">
+              {lookupError}
+            </p>
+          )}
+
+          <div className="flex gap-3 mt-1">
             <button
               type="submit"
-              className="px-8 py-2.5 rounded-full text-black font-bold text-sm transition-all hover:opacity-80"
+              disabled={looking || digits.length === 0}
+              className="px-8 py-3 rounded-full text-black font-bold text-sm transition-all hover:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ backgroundColor: "#B5E533" }}
             >
-              Continue
+              {looking ? "Looking…" : "Continue"}
             </button>
             <button
               type="button"
-              className="px-8 py-2.5 rounded-full border-2 border-gray-300 font-bold text-sm text-gray-600 hover:bg-gray-100 transition-all"
-              onClick={() => {
-                setShowOrderInput(false);
-                setOrderNumber("");
-              }}
+              className="px-8 py-3 rounded-full border-2 border-gray-300 font-bold text-sm text-gray-600 hover:bg-gray-100 transition-all"
+              onClick={handleClose}
             >
               Cancel
             </button>
